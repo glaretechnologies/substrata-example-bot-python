@@ -8,6 +8,8 @@ Note that you will need to update an object in a parcel you own for this script 
 
 
 You will need to put a file call config.txt with contents like this in the script directory, before running the script:
+```
 [credentials]
 Username = MyUserName
 Password = MyPassword
+```
