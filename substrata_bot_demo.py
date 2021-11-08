@@ -86,8 +86,7 @@ class BufferIn:
 plain_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 conn = ssl.wrap_socket(plain_socket)
-conn.connect(('localhost',  7600))
-#conn.connect(('substrata.info',  7600))
+conn.connect(('test.substrata.info',  7600))
 
 print("Connected.")
 
