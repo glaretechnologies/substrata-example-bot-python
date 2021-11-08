@@ -7,7 +7,7 @@ It updates the transform of a particular object every 0.1 seconds by sending a O
 Note that you will need to update an object in a parcel you own for this script to have any effect.
 
 
-You will need to put a file call config.txt with contents like this in the script directory, before running the script:
+You will need to put a file called config.txt with contents like this in the script directory, before running the script:
 ```
 [credentials]
 Username = MyUserName
