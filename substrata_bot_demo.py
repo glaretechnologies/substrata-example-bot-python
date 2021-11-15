@@ -626,26 +626,29 @@ while(1):
 			else:
 				ob = world_obs.get(152870)
 				if ob is not None:
-					print("Writng ob to stream...")
+					try:
+						print("Writng ob to stream...")
 
-					eth_price_usd = getEthPriceInUSD()
+						eth_price_usd = getEthPriceInUSD()
 
-					gas_price_gwei = getEthGasPriceInGWEI(EtherscanAPIKey)
+						gas_price_gwei = getEthGasPriceInGWEI(EtherscanAPIKey)
 
-					ob.content = "Eth: \n" + str(eth_price_usd) + " USD\n\n" # Update hypercard contents
+						ob.content = "Eth: \n" + str(eth_price_usd) + " USD\n\n" # Update hypercard contents
 
-					ob.content += "Gas: \n" + str(gas_price_gwei) + " Gwei\n\n"
+						ob.content += "Gas: \n" + str(gas_price_gwei) + " Gwei\n\n"
 
-					ob.content += "Last updated: \n" + str(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))
+						ob.content += "Last updated: \n" + str(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))
 
-					print("Set content to " + ob.content)
+						print("Set content to " + ob.content)
 
-					buffer_out = BufferOut()
-					buffer_out.writeUInt32(ObjectFullUpdate)
-					buffer_out.writeUInt32(0) # will be updated with length
-					ob.writeToStream(buffer_out)
-					buffer_out.updateLengthField()
-					buffer_out.writeToSocket(conn)
+						buffer_out = BufferOut()
+						buffer_out.writeUInt32(ObjectFullUpdate)
+						buffer_out.writeUInt32(0) # will be updated with length
+						ob.writeToStream(buffer_out)
+						buffer_out.updateLengthField()
+						buffer_out.writeToSocket(conn)
+					except Exception as err:
+						print("Caught exception: " + str(err))
 
 		else:
 			time.sleep(0.01)
