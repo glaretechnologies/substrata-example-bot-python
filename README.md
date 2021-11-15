@@ -12,4 +12,7 @@ You will need to put a file called config.txt with contents like this in the scr
 [credentials]
 Username = MyUserName
 Password = MyPassword
+
+[APIKeys]
+EtherscanAPIKey = XXXX
 ```
