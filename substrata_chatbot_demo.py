@@ -6,7 +6,7 @@ import socket, ssl, pprint, time, select, struct, math, configparser, requests, 
 
 
 CyberspaceHello = 1357924680
-CyberspaceProtocolVersion = 31
+CyberspaceProtocolVersion = 40
 ClientProtocolOK		= 10000
 ClientProtocolTooOld	= 10001
 ClientProtocolTooNew	= 10002
@@ -20,6 +20,8 @@ ChatMessageID			= 2000
 
 ObjectTransformUpdate	= 3002
 ObjectFullUpdate		= 3003
+
+ObjectContentChanged	= 3017
 
 QueryObjects			= 3020
 ObjectInitialSend		= 3021
@@ -39,7 +41,7 @@ ANIM_STATE_IN_AIR		= 1 # Is the avatar not touching the ground? Could be jumping
 ANIM_STATE_FLYING		= 2 # Is the player flying (e.g. do they have flying movement mode on)
 
 
-WORLD_MATERIAL_SERIALISATION_VERSION = 6
+WORLD_MATERIAL_SERIALISATION_VERSION = 8
 TIMESTAMP_SERIALISATION_VERSION = 1
 
 
@@ -58,6 +60,8 @@ def readNBytesFromSocket(socket, n):
 	b = bytearray()
 	while(remaining > 0):
 		chunk = socket.recv(remaining)
+		if(len(chunk) == 0):
+			raise Exception("Socket was closed gracefully by remote host.")
 		b.extend(chunk)
 		remaining -= len(chunk)
 	return b
@@ -79,7 +83,9 @@ def writeUID(socket, uid):
 def socketReadable(socket, timeout_s):
 	socket_list = [socket]
 	read_sockets, write_sockets, error_sockets = select.select(socket_list, [], socket_list, timeout_s)
-	return len(read_sockets) == 1 or len(error_sockets) == 1
+	if(len(error_sockets) == 1):
+		raise Exception("Socket excep")
+	return len(read_sockets) == 1
 
 
 
@@ -275,12 +281,19 @@ class WorldMaterial:
 		pass
 
 	def readFromStream(self, stream):
+		initial_read_index = stream.read_index
+
 		version = stream.readUInt32()
 		if (version > WORLD_MATERIAL_SERIALISATION_VERSION):
-			raise Exception("Unsupported version " + str(v) + ", expected " + str(WORLD_MATERIAL_SERIALISATION_VERSION) + ".")
+			raise Exception("Unsupported version " + str(version) + ", expected " + str(WORLD_MATERIAL_SERIALISATION_VERSION) + ".")
+
+		buffer_size = stream.readUInt32()
 
 		self.colour_rgb = readColour3fFromStream(buffer_in)
 		self.colour_texture_url = buffer_in.readStringLengthFirst()
+
+		self.emission_rgb = readColour3fFromStream(buffer_in)
+		self.emission_texture_url = buffer_in.readStringLengthFirst()
 
 		self.roughness = readScalarValFromStream(buffer_in)
 		self.metallic_fraction = readScalarValFromStream(buffer_in)
@@ -292,8 +305,17 @@ class WorldMaterial:
 
 		self.flags = buffer_in.readUInt32()
 
+		self.normal_map_url = buffer_in.readStringLengthFirst()
+
+		# Discard any remaining unread data
+		read_B = stream.read_index - initial_read_index # Number of bytes we have read so far
+		if(read_B < buffer_size):
+			stream.read_index += buffer_size - read_B
+
 	def writeToStream(self, stream):
 		stream.writeUInt32(WORLD_MATERIAL_SERIALISATION_VERSION)
+
+		# TODO: this is out of date, update
 
 		self.colour_rgb.writeToStream(stream)
 		stream.writeStringLengthFirst(self.colour_texture_url)
@@ -496,6 +518,7 @@ config = configparser.ConfigParser()
 config.read('config.txt')
 username = config['credentials']['username']
 password = config['credentials']['password']
+server_hostname = config['connection']['server_hostname']
 
 if username is None:
 	raise Exception("Could not find 'username' in config file.")
@@ -509,10 +532,12 @@ plain_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 plain_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
 
-conn = ssl.wrap_socket(plain_socket)
-conn.connect(('test.substrata.info',  7600))
+print("Connecting to server '" + server_hostname + "'...")
 
-print("Connected to server.")
+conn = ssl.wrap_socket(plain_socket)
+conn.connect((server_hostname,  7600))
+
+print("Connected to server '" + server_hostname + "'.")
 
 writeUInt32ToSocket(conn, CyberspaceHello)
 writeUInt32ToSocket(conn, CyberspaceProtocolVersion)
@@ -533,6 +558,10 @@ elif(protocol_response == ClientProtocolOK):
 	print("ClientProtocolOK")
 else:
 	raise Exception("Invalid protocol version response from server: " + protocol_response);
+
+# Read server protocol version
+server_protocol_version = readUInt32FromSocket(conn)
+print('server_protocol_version: ', str(server_protocol_version))
 
 client_avatar_UID = readUID(conn)
 print("Received client_avatar_UID: " + str(client_avatar_UID))
@@ -566,6 +595,11 @@ def sendQueryObjectsMessage(conn):
 	buffer_out.writeUInt32(QueryObjects)
 	buffer_out.writeUInt32(0) # message length - to be updated.
 	r = 4
+	# Write camera position
+	buffer_out.writeDouble(0.0)
+	buffer_out.writeDouble(0.0)
+	buffer_out.writeDouble(0.0)
+
 	buffer_out.writeUInt32(2 * (2 * r + 1) * (2 * r + 1)) # Num cells to query
 
 	for x in range(-r, r+1): # (let x = -r; x <= r; ++x)
@@ -596,6 +630,8 @@ while(1):
 		# Read and handle message(s)
 		msg_type = readUInt32FromSocket(conn)
 		msg_len = readUInt32FromSocket(conn)
+
+		#print("Received msg, type: " + str(msg_type) + ", len: " + str(msg_len))
 
 		if(msg_len < 8):
 			raise Exception("Invalid msg len: " + str(msg_len))
@@ -635,56 +671,61 @@ while(1):
 			world_obs[world_ob.uid] = world_ob
 
 			print("num object: " + str(len(world_obs)))
+		elif(msg_type == ObjectContentChanged):
+			#print("Received ObjectContentChanged")
+			
+			object_uid = buffer_in.readUInt64()
+			new_content = buffer_in.readStringLengthFirst()
+
+			#print("object_uid: " + str(object_uid) + ", new_content: '" + new_content + "'")
 		else:
-			print("Received msg, type: " + str(msg_type) + ", len: " + str(msg_len))
+			print("Received unknown/unhandled msg type: " + str(msg_type))
 			pass
 
-	else: # Else if socket was not readable:
 		
-		UPDATE_PERIOD = 0.1 # How often we send an object update message to the server, in seconds
+	UPDATE_PERIOD = 0.1 # How often we send an object update message to the server, in seconds
 
-		if(time.monotonic() - last_send_time > UPDATE_PERIOD):
+	if(time.monotonic() - last_send_time > UPDATE_PERIOD):
 
-			# Send a message to the server
+		# Send a message to the server
 
-			# print("Sending message to server...")
+		# print("Sending message to server...")
 
-			t = time.monotonic() - initial_time
+		# Make the avatar walk in a circle
+		t = time.monotonic() - initial_time
 		
-			phase = t * 0.6
+		phase = t * 0.6
 			
-			avatar.pos.x = math.cos(phase) * 4
-			avatar.pos.y = math.sin(phase) * 4
-			avatar.pos.z = 1.67
+		avatar.pos.x = math.cos(phase) * 4
+		avatar.pos.y = math.sin(phase) * 4
+		avatar.pos.z = 1.67
 			
-			avatar.rotation = Vec3f(0.0, math.pi / 2, phase + math.pi / 2)  # (roll, pitch, heading)
+		# Compute the avatar rotation so that it faces forwards
+		avatar.rotation = Vec3f(0.0, math.pi / 2, phase + math.pi / 2)  # (roll, pitch, heading)
 
-			# Send an AvatarTransformUpdate message
-			anim_state = 0
+		# Send an AvatarTransformUpdate message
+		anim_state = 0
 
-			buffer_out = BufferOut()
-			buffer_out.writeUInt32(AvatarTransformUpdate)
-			buffer_out.writeUInt32(0) # will be updated with length
-			writeUID(buffer_out, client_avatar_UID)
-			avatar.pos.writeToStream(buffer_out)
-			avatar.rotation.writeToStream(buffer_out)
-			buffer_out.writeUInt32(anim_state)
-			buffer_out.updateLengthField()
-			buffer_out.writeToSocket(conn)
+		buffer_out = BufferOut()
+		buffer_out.writeUInt32(AvatarTransformUpdate)
+		buffer_out.writeUInt32(0) # will be updated with length
+		writeUID(buffer_out, client_avatar_UID)
+		avatar.pos.writeToStream(buffer_out)
+		avatar.rotation.writeToStream(buffer_out)
+		buffer_out.writeUInt32(anim_state)
+		buffer_out.updateLengthField()
+		buffer_out.writeToSocket(conn)
 
 			
-			last_send_time = time.monotonic()
-		else:
-			time.sleep(0.01)
+		last_send_time = time.monotonic()
 
+	# Send a chat message occasionally
+	if(time.monotonic() - last_chat_time > 5.0):
+		buffer_out = BufferOut()
+		buffer_out.writeUInt32(ChatMessageID)
+		buffer_out.writeUInt32(0) # will be updated with length
+		buffer_out.writeStringLengthFirst("Beep boop") # message
+		buffer_out.updateLengthField()
+		buffer_out.writeToSocket(conn)
 
-		# Send a chat message occasionally
-		if(time.monotonic() - last_chat_time > 5.0):
-			buffer_out = BufferOut()
-			buffer_out.writeUInt32(ChatMessageID)
-			buffer_out.writeUInt32(0) # will be updated with length
-			buffer_out.writeStringLengthFirst("Beep boop") # message
-			buffer_out.updateLengthField()
-			buffer_out.writeToSocket(conn)
-
-			last_chat_time = time.monotonic()
+		last_chat_time = time.monotonic()
