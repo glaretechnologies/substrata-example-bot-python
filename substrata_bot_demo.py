@@ -481,6 +481,7 @@ config = configparser.ConfigParser()
 config.read('config.txt')
 username = config['credentials']['username']
 password = config['credentials']['password']
+server_hostname = config['connection']['server_hostname']
 
 if username is None:
 	raise Exception("Could not find 'username' in config file.")
@@ -496,11 +497,13 @@ print("Using username '" + username + "'")
 
 plain_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-conn = ssl.wrap_socket(plain_socket)
-conn.connect(('substrata.info',  7600))
-#conn.connect(('localhost',  7600))
+print("Connecting to server '" + server_hostname + "'...")
 
-print("Connected to server.")
+conn = ssl.wrap_socket(plain_socket)
+conn.connect((server_hostname, 7600))
+
+print("Connected to server '" + server_hostname + "'.")
+
 
 writeUInt32ToSocket(conn, CyberspaceHello)
 writeUInt32ToSocket(conn, CyberspaceProtocolVersion)
