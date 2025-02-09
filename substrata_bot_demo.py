@@ -52,6 +52,8 @@ def readNBytesFromSocket(socket, n):
 	b = bytearray()
 	while(remaining > 0):
 		chunk = socket.recv(remaining)
+		if(len(chunk) == 0):
+			raise Exception("Socket was closed gracefully by remote host.")
 		b.extend(chunk)
 		remaining -= len(chunk)
 	return b
@@ -266,12 +268,19 @@ class WorldMaterial:
 		pass
 
 	def readFromStream(self, stream):
+		initial_read_index = stream.read_index
+
 		version = stream.readUInt32()
 		if (version > WORLD_MATERIAL_SERIALISATION_VERSION):
-			raise Exception("Unsupported version " + str(v) + ", expected " + str(WORLD_MATERIAL_SERIALISATION_VERSION) + ".")
+			raise Exception("Unsupported version " + str(version) + ", expected " + str(WORLD_MATERIAL_SERIALISATION_VERSION) + ".")
+
+		buffer_size = stream.readUInt32()
 
 		self.colour_rgb = readColour3fFromStream(buffer_in)
 		self.colour_texture_url = buffer_in.readStringLengthFirst()
+
+		self.emission_rgb = readColour3fFromStream(buffer_in)
+		self.emission_texture_url = buffer_in.readStringLengthFirst()
 
 		self.roughness = readScalarValFromStream(buffer_in)
 		self.metallic_fraction = readScalarValFromStream(buffer_in)
@@ -282,6 +291,13 @@ class WorldMaterial:
 		self.emission_lum_flux = buffer_in.readFloat()
 
 		self.flags = buffer_in.readUInt32()
+
+		self.normal_map_url = buffer_in.readStringLengthFirst()
+
+		# Discard any remaining unread data
+		read_B = stream.read_index - initial_read_index # Number of bytes we have read so far
+		if(read_B < buffer_size):
+			stream.read_index += buffer_size - read_B
 
 	def writeToStream(self, stream):
 		stream.writeUInt32(WORLD_MATERIAL_SERIALISATION_VERSION)
@@ -469,9 +485,9 @@ if username is None:
 if password is None:
 	raise Exception("Could not find 'password' in config file.")
 
-EtherscanAPIKey = config['APIKeys']['EtherscanAPIKey']
-if EtherscanAPIKey is None:
-	raise Exception("Could not find 'EtherscanAPIKey' in config file.")
+#EtherscanAPIKey = config['APIKeys']['EtherscanAPIKey']
+#if EtherscanAPIKey is None:
+#	raise Exception("Could not find 'EtherscanAPIKey' in config file.")
 
 print("Using username '" + username + "'")
 
@@ -552,6 +568,8 @@ while(1):
 		msg_type = readUInt32FromSocket(conn)
 		msg_len = readUInt32FromSocket(conn)
 
+		#print("Received msg, type: " + str(msg_type) + ", len: " + str(msg_len))
+
 		if(msg_len < 8):
 			raise Exception("Invalid msg len: " + str(msg_len))
 
@@ -563,7 +581,7 @@ while(1):
 			
 			global_time = buffer_in.readDouble()
 
-			print("Received TimeSyncMessage: global_time: " + str(global_time))
+			#print("Received TimeSyncMessage: global_time: " + str(global_time))
 		elif(msg_type == ChatMessageID):
 		
 			name = buffer_in.readStringLengthFirst()
@@ -590,68 +608,71 @@ while(1):
 			world_obs[world_ob.uid] = world_ob
 
 			print("num object: " + str(len(world_obs)))
+		elif(msg_type == ObjectContentChanged):
+			#print("Received ObjectContentChanged")
+			
+			object_uid = buffer_in.readUInt64()
+			new_content = buffer_in.readStringLengthFirst()
+
+			#print("object_uid: " + str(object_uid) + ", new_content: '" + new_content + "'")
 		else:
-			print("Received msg, type: " + str(msg_type) + ", len: " + str(msg_len))
+			print("Received unknown/unhandled msg type: " + str(msg_type))
 			pass
 
-	else: # Else if socket was not readable:
-		
-		UPDATE_PERIOD = 10.0 # How often we send an object update message to the server, in seconds
+	UPDATE_PERIOD = 10.0 # How often we send an object update message to the server, in seconds
 
-		if(time.monotonic() - last_send_time > UPDATE_PERIOD):
+	if(time.monotonic() - last_send_time > UPDATE_PERIOD):
 
-			# Send a message to the server
-			last_send_time = time.monotonic()
+		# Send a message to the server
+		last_send_time = time.monotonic()
 
-			# print("Sending message to server...")
+		# print("Sending message to server...")
 
-			if False:
-				buffer_out = BufferOut()
-				buffer_out.writeUInt32(ObjectTransformUpdate)
-				buffer_out.writeUInt32(0) # will be updated with length
-				buffer_out.writeUInt64(152719) # Write object UID
+		if False:
+			buffer_out = BufferOut()
+			buffer_out.writeUInt32(ObjectTransformUpdate)
+			buffer_out.writeUInt32(0) # will be updated with length
+			buffer_out.writeUInt64(152719) # Write object UID
 
-				buffer_out.writeDouble(12.12375831604) # Write object pos x
-				buffer_out.writeDouble(51.971897125244)# + (time.monotonic() - initial_time)) # Write object pos y
-				buffer_out.writeDouble(1.063417524099)# + math.sin(time.monotonic()) + 1.0) # Write object pos z
+			buffer_out.writeDouble(12.12375831604) # Write object pos x
+			buffer_out.writeDouble(51.971897125244)# + (time.monotonic() - initial_time)) # Write object pos y
+			buffer_out.writeDouble(1.063417524099)# + math.sin(time.monotonic()) + 1.0) # Write object pos z
 
-				buffer_out.writeFloat(1.0) # Write object axis x
-				buffer_out.writeFloat(0) # Write object axis y
-				buffer_out.writeFloat(math.sin(time.monotonic() - initial_time)) # Write object axis z
-				buffer_out.writeFloat(time.monotonic() - initial_time + math.pi / 2.0) # Write object angle
+			buffer_out.writeFloat(1.0) # Write object axis x
+			buffer_out.writeFloat(0) # Write object axis y
+			buffer_out.writeFloat(math.sin(time.monotonic() - initial_time)) # Write object axis z
+			buffer_out.writeFloat(time.monotonic() - initial_time + math.pi / 2.0) # Write object angle
 
-				buffer_out.updateLengthField()
+			buffer_out.updateLengthField()
 
-				buffer_out.writeToSocket(conn)
-			else:
-				ob = world_obs.get(152870)
-				if ob is not None:
-					try:
-						print("Writng ob to stream...")
-
-						eth_price_usd = getEthPriceInUSD()
-
-						gas_price_gwei = getEthGasPriceInGWEI(EtherscanAPIKey)
-
-						ob.content = "Eth: \n" + str(eth_price_usd) + " USD\n\n" # Update hypercard contents
-
-						ob.content += "Gas: \n" + str(gas_price_gwei) + " Gwei\n\n"
-
-						ob.content += "Last updated: \n" + str(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))
-
-						print("Set content to " + ob.content)
-
-						buffer_out = BufferOut()
-						buffer_out.writeUInt32(ObjectFullUpdate)
-						buffer_out.writeUInt32(0) # will be updated with length
-						ob.writeToStream(buffer_out)
-						buffer_out.updateLengthField()
-						buffer_out.writeToSocket(conn)
-					except Exception as err:
-						print("Caught exception: " + str(err))
-
+			buffer_out.writeToSocket(conn)
 		else:
-			time.sleep(0.01)
+			ob = world_obs.get(152870)
+			if ob is not None:
+				try:
+					print("Writng ob to stream...")
+
+					eth_price_usd = getEthPriceInUSD()
+
+					#gas_price_gwei = getEthGasPriceInGWEI(EtherscanAPIKey)
+
+					ob.content = "Eth: \n" + str(eth_price_usd) + " USD\n\n" # Update hypercard contents
+
+					#ob.content += "Gas: \n" + str(gas_price_gwei) + " Gwei\n\n"
+
+					ob.content += "Last updated: \n" + str(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))
+
+					print("Set content to " + ob.content)
+
+					buffer_out = BufferOut()
+					buffer_out.writeUInt32(ObjectFullUpdate)
+					buffer_out.writeUInt32(0) # will be updated with length
+					ob.writeToStream(buffer_out)
+					buffer_out.updateLengthField()
+					buffer_out.writeToSocket(conn)
+				except Exception as err:
+					print("Caught exception: " + str(err))
+
 
 
 
