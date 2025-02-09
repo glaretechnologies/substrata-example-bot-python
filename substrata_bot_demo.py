@@ -6,7 +6,7 @@ import socket, ssl, pprint, time, select, struct, math, configparser, requests, 
 
 
 CyberspaceHello = 1357924680
-CyberspaceProtocolVersion = 31
+CyberspaceProtocolVersion = 40
 ClientProtocolOK		= 10000
 ClientProtocolTooOld	= 10001
 ClientProtocolTooNew	= 10002
@@ -19,6 +19,8 @@ ChatMessageID			= 2000
 
 ObjectTransformUpdate	= 3002
 ObjectFullUpdate		= 3003
+
+ObjectContentChanged	= 3017
 
 QueryObjects			= 3020
 ObjectInitialSend		= 3021
@@ -33,7 +35,7 @@ LogInMessage			= 8000
 
 TimeSyncMessage			= 9000
 
-WORLD_MATERIAL_SERIALISATION_VERSION = 6
+WORLD_MATERIAL_SERIALISATION_VERSION = 8
 TIMESTAMP_SERIALISATION_VERSION = 1
 
 
@@ -520,6 +522,10 @@ elif(protocol_response == ClientProtocolOK):
 else:
 	raise Exception("Invalid protocol version response from server: " + protocol_response);
 
+# Read server protocol version
+server_protocol_version = readUInt32FromSocket(conn)
+print('server_protocol_version: ', str(server_protocol_version))
+
 client_avatar_UID = readUID(conn)
 
 
@@ -538,6 +544,11 @@ def sendQueryObjectsMessage(conn):
 	buffer_out.writeUInt32(QueryObjects)
 	buffer_out.writeUInt32(0) # message length - to be updated.
 	r = 4
+	# Write camera position
+	buffer_out.writeDouble(0.0)
+	buffer_out.writeDouble(0.0)
+	buffer_out.writeDouble(0.0)
+
 	buffer_out.writeUInt32(2 * (2 * r + 1) * (2 * r + 1)) # Num cells to query
 
 	for x in range(-r, r+1): # (let x = -r; x <= r; ++x)
