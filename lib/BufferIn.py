@@ -41,3 +41,10 @@ class BufferIn:
 		string_bytes = self.data_byte_array[self.read_index : self.read_index + strlen]
 		self.read_index += strlen
 		return string_bytes.decode('UTF-8')
+
+	# Returns bytearray
+	def readBytes(self, num_bytes):
+		d = self.data_byte_array[self.read_index : self.read_index + num_bytes]
+		self.read_index += num_bytes
+		return d
+

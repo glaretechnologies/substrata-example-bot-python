@@ -37,6 +37,9 @@ class BufferOut:
 		self.writeUInt32(len(b))
 		self.data += b
 
+	def writeBytes(self, the_byte_array):
+		self.data += the_byte_array
+
 	def updateLengthField(self):
 		data_len = len(self.data)
 		b = data_len.to_bytes(4, byteorder='little')

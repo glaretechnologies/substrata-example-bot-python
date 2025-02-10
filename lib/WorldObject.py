@@ -3,10 +3,22 @@
 #
 
 import struct
+
+from numpy import object_
 from lib.BasicTypes import Vec3d, Vec3f, Colour3f, Matrix2f, TimeStamp, readColour3fFromStream, readMatrix2fFromStream, readVec3fFromStream, readVec3dFromStream, readTimeStampFromStream
 from lib.WorldMaterial import WorldMaterial
 
 class WorldObject:
+
+	ObjectType_Generic = 0
+	ObjectType_Hypercard = 1
+	ObjectType_VoxelGroup = 2
+	ObjectType_Spotlight = 3
+	ObjectType_WebView = 4
+	ObjectType_Video = 5 # A Youtube or Twitch video, or mp4 video, with video-specific UI.
+	ObjectType_Text = 6 # Text displayed on a quad
+
+
 	def __init__(self):
 		self.data = []
 
@@ -58,6 +70,8 @@ class WorldObject:
 		self.chunk_batch1_start = 0
 		self.chunk_batch1_end = 0
 
+		self.compressed_voxels = bytearray()
+
 
 	def writeToStream(self, stream):
 		stream.writeUInt64(self.uid)
@@ -89,12 +103,17 @@ class WorldObject:
 
 		stream.writeStringLengthFirst(self.creator_name)
 
-		print("writing self.aabb_min to stream: " + str(self.aabb_min.x) + ", " + str(self.aabb_min.y) + ", " + str(self.aabb_min.z))
+		#print("writing self.aabb_min to stream: " + str(self.aabb_min.x) + ", " + str(self.aabb_min.y) + ", " + str(self.aabb_min.z))
 		self.aabb_min.writeToStream(stream)
-		print("writing self.aabb_max to stream: " + str(self.aabb_max.x) + ", " + str(self.aabb_max.y) + ", " + str(self.aabb_max.z))
+		#print("writing self.aabb_max to stream: " + str(self.aabb_max.x) + ", " + str(self.aabb_max.y) + ", " + str(self.aabb_max.z))
 		self.aabb_max.writeToStream(stream)
 
 		stream.writeInt32(self.max_model_lod_level)
+
+		# Write compressed voxel data if object_type == WorldObject::ObjectType_VoxelGroup
+		if(self.object_type == self.ObjectType_VoxelGroup):
+			stream.writeUInt32(len(self.voxel_data_size))
+			stream.writeBytes(self.voxel_data_size)
 
 		stream.writeFloat(self.mass)
 		stream.writeFloat(self.friction)
@@ -150,15 +169,18 @@ class WorldObject:
 		self.aabb_min = readVec3fFromStream(stream)
 		self.aabb_max = readVec3fFromStream(stream)
 		
-		print("self.uid: " + str(self.uid))
-		print("self.creator_name: " + self.creator_name)
-		print("Read scale: " + str(self.scale.x) + ", " + str(self.scale.y) + ", " + str(self.scale.z))
-		print("Read aabb_min: " + str(self.aabb_min.x) + ", " + str(self.aabb_min.y) + ", " + str(self.aabb_min.z))
-		print("Read aabb_max: " + str(self.aabb_max.x) + ", " + str(self.aabb_max.y) + ", " + str(self.aabb_max.z))
+		#print("self.uid: " + str(self.uid))
+		#print("self.creator_name: " + self.creator_name)
+		#print("Read scale: " + str(self.scale.x) + ", " + str(self.scale.y) + ", " + str(self.scale.z))
+		#print("Read aabb_min: " + str(self.aabb_min.x) + ", " + str(self.aabb_min.y) + ", " + str(self.aabb_min.z))
+		#print("Read aabb_max: " + str(self.aabb_max.x) + ", " + str(self.aabb_max.y) + ", " + str(self.aabb_max.z))
 
 		self.max_model_lod_level = stream.readInt32()
 
-		# TODO: read compressed voxel data if object_type == WorldObject::ObjectType_VoxelGroup
+		# read compressed voxel data if object_type == WorldObject::ObjectType_VoxelGroup
+		if(self.object_type == self.ObjectType_VoxelGroup):
+			voxel_data_size = stream.readUInt32()
+			compressed_voxels = stream.readBytes(voxel_data_size)
 
 		self.mass = stream.readFloat()
 		self.friction = stream.readFloat()
