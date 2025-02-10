@@ -25,6 +25,7 @@ from lib.Protocol import Protocol
 
 
 
+#------------------------- Define some misc. functions -------------------------
 def writeUInt32ToSocket(socket, x):
 	b = x.to_bytes(4, byteorder='little')
 	socket.sendall(b)
@@ -66,9 +67,6 @@ def socketReadable(socket, timeout_s):
 	if(len(error_sockets) == 1):
 		raise Exception("Socket excep")
 	return len(read_sockets) == 1
-
-
-
 
 
 

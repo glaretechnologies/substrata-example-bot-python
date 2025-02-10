@@ -43,6 +43,22 @@ class WorldObject:
 
 		self.max_model_lod_level = 0 # int32
 
+		self.mass = 10.0
+		self.friction = 0.5
+		self.restitution = 0.5
+
+		self.physics_owner_id = 0
+
+		self.last_physics_ownership_change_global_time = 0.0
+
+		self.centre_of_mass_offset_os = Vec3f(0, 0, 0)
+
+		self.chunk_batch0_start = 0
+		self.chunk_batch0_end = 0
+		self.chunk_batch1_start = 0
+		self.chunk_batch1_end = 0
+
+
 	def writeToStream(self, stream):
 		stream.writeUInt64(self.uid)
 		stream.writeUInt32(self.object_type)
@@ -80,6 +96,21 @@ class WorldObject:
 
 		stream.writeInt32(self.max_model_lod_level)
 
+		stream.writeFloat(self.mass)
+		stream.writeFloat(self.friction)
+		stream.writeFloat(self.restitution)
+
+		stream.writeUInt32(self.physics_owner_id)
+		stream.writeDouble(self.last_physics_ownership_change_global_time)
+
+		self.centre_of_mass_offset_os.writeToStream(stream)
+
+		stream.writeUInt32(self.chunk_batch0_start)
+		stream.writeUInt32(self.chunk_batch0_end)
+		stream.writeUInt32(self.chunk_batch1_start)
+		stream.writeUInt32(self.chunk_batch1_end)
+
+
 	def readFromStream(self, stream):
 		self.uid = stream.readUInt64()
 		self.object_type = stream.readUInt32()
@@ -87,7 +118,7 @@ class WorldObject:
 
 		# Read materials
 		num_mats = stream.readUInt32()
-		if (num_mats > 10000):
+		if (num_mats > 2048):
 			raise Exception("Too many mats: " + str(num_mats))
 		self.materials = []
 		for i in range(0, num_mats):
@@ -127,4 +158,19 @@ class WorldObject:
 
 		self.max_model_lod_level = stream.readInt32()
 
-		# TODO: read compressed voxel data
+		# TODO: read compressed voxel data if object_type == WorldObject::ObjectType_VoxelGroup
+
+		self.mass = stream.readFloat()
+		self.friction = stream.readFloat()
+		self.restitution = stream.readFloat()
+
+		self.physics_owner_id = stream.readUInt32()
+
+		self.last_physics_ownership_change_global_time = stream.readDouble()
+
+		self.centre_of_mass_offset_os = readVec3fFromStream(stream)
+
+		self.chunk_batch0_start = stream.readUInt32()
+		self.chunk_batch0_end = stream.readUInt32()
+		self.chunk_batch1_start = stream.readUInt32()
+		self.chunk_batch1_end = stream.readUInt32()

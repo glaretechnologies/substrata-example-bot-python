@@ -16,6 +16,10 @@ class BufferOut:
 		b = x.to_bytes(4, byteorder='little')
 		self.data += b
 
+	def writeUInt32AtIndex(self, x, index):
+		b = x.to_bytes(4, byteorder='little')
+		self.data[index:index+4] = b
+
 	def writeUInt64(self, x):
 		b = x.to_bytes(8, byteorder='little')
 		self.data += b
@@ -44,4 +48,8 @@ class BufferOut:
 
 	def writeToSocket(self, socket):
 		socket.sendall(bytes(self.data))
+
+	def getWriteIndex(self):
+		return len(self.data)
+
 

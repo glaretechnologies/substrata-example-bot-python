@@ -62,12 +62,21 @@ class WorldMaterial:
 			stream.read_index += buffer_size - read_B
 
 	def writeToStream(self, stream):
+		# Write to stream with a length prefix.  Do this by writing to the stream, them going back and writing the length of the data we wrote.
+		# Writing a length prefix allows for adding more fields later, while retaining backwards compatibility with older code that can just skip over the new fields.
+
+		initial_write_index = stream.getWriteIndex()
+
 		stream.writeUInt32(WORLD_MATERIAL_SERIALISATION_VERSION)
+		stream.writeUInt32(0) # Size of buffer will be written here later
 
 		# TODO: this is out of date, update
 
 		self.colour_rgb.writeToStream(stream)
 		stream.writeStringLengthFirst(self.colour_texture_url)
+
+		self.emission_rgb.writeToStream(stream)
+		stream.writeStringLengthFirst(self.emission_texture_url)
 
 		self.roughness.writeToStream(stream)
 		self.metallic_fraction.writeToStream(stream)
@@ -78,4 +87,12 @@ class WorldMaterial:
 		stream.writeFloat(self.emission_lum_flux)
 
 		stream.writeUInt32(self.flags)
+
+		stream.writeStringLengthFirst(self.normal_map_url)
+
+		# Go back and write size of buffer to buffer size field
+		buffer_size = stream.getWriteIndex() - initial_write_index
+
+		#std::memcpy(stream.getWritePtrAtIndex(initial_write_index + sizeof(uint32)), &buffer_size, sizeof(uint32));
+		stream.writeUInt32AtIndex(buffer_size, initial_write_index + 4)
 

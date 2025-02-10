@@ -12,16 +12,14 @@ See https://www.youtube.com/watch?v=j-ja0_GcB4s for a video of it.
 
 ## substrata_bot_demo.py
 
-NOTE: Fixing this script up!!!
-
 This script is an example of updating an object on a Substrata server.
 
 It updates an existing text object on the server with the current Eth price, fetched from api.coinbase.com.
 
-Note that you will need to update an object in a parcel you own for this script to have any effect.
+Note that you will need to update an object in a parcel you own for this script to have any effect. 
+You will also need to set OB_TO_CHANGE_UID to the UID of the existing text object to update.
 
-NOTE: Fixing this script up!!!
-
+See https://youtu.be/YSB8cmtEpSQ for a video of it.
 
 ## Running
 
