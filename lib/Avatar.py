@@ -4,6 +4,7 @@
 
 import struct
 from lib.BasicTypes import Vec3d, Vec3f, Colour3f, Matrix2f, TimeStamp, readColour3fFromStream, readMatrix2fFromStream, readVec3fFromStream, readVec3dFromStream, readTimeStampFromStream
+from lib.WorldMaterial import WorldMaterial
 
 
 class AvatarSettings:
@@ -25,7 +26,7 @@ class AvatarSettings:
 
 		
 	def readFromStream(self, stream):
-		self.uid = stream.readUInt64()
+		self.model_url = stream.readStringLengthFirst()
 
 		# Read materials
 		num_mats = stream.readUInt32()

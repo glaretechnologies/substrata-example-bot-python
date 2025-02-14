@@ -140,6 +140,7 @@ login_buf.writeToSocket(conn)
 
 
 avatar = Avatar()
+avatar.uid = client_avatar_UID
 avatar.pos = Vec3d(5, 5, 2)
 
 
@@ -181,6 +182,24 @@ while(1):
 			global_time = buffer_in.readDouble()
 
 			#print("Received TimeSyncMessage: global_time: " + str(global_time))
+		elif(msg_type == Protocol.LoggedInMessageID):
+			print("Received LoggedInMessageID")
+			logged_in_user_id = buffer_in.readUInt32()
+			logged_in_username = buffer_in.readStringLengthFirst()
+			avatar.avatar_settings.readFromStream(buffer_in) # Read avatar settings (which are stored on the server for each user)
+			logged_in_user_flags = buffer_in.readUInt32()
+
+			avatar.name = logged_in_username
+
+			print("Sending AvatarFullUpdate...")
+			# Send AvatarFullUpdate message, to change the nametag and model on our avatar.
+			buffer_out = BufferOut()
+			buffer_out.writeUInt32(Protocol.AvatarFullUpdate)
+			buffer_out.writeUInt32(0) # will be updated with length of message
+			avatar.writeToStream(buffer_out)
+			buffer_out.updateLengthField()
+			buffer_out.writeToSocket(conn) # Send it
+
 		elif(msg_type == Protocol.ChatMessageID):
 		
 			name = buffer_in.readStringLengthFirst()
@@ -216,7 +235,6 @@ while(1):
 			#print("object_uid: " + str(object_uid) + ", new_content: '" + new_content + "'")
 		else:
 			print("Received unknown/unhandled msg type: " + str(msg_type) + ", ignoring.")
-			pass
 
 		
 	UPDATE_PERIOD = 0.1 # How often we send an object update message to the server, in seconds
