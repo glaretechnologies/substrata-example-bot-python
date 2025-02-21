@@ -122,7 +122,7 @@ print("Connecting to server '" + server_hostname + "'...")
 # https://stackoverflow.com/questions/4818280/ssl-wrap-socket-attributeerror-module-object-has-no-attribute-wrap-socket
 sslSettings = ssl.SSLContext(ssl.PROTOCOL_TLS)
 conn = sslSettings.wrap_socket(plain_socket)
-conn.connect(server_hostname,  7600)
+conn.connect((server_hostname,  7600))
 
 print("Connected to server '" + server_hostname + "'.")
 
