@@ -44,6 +44,7 @@ class WorldObject:
 		self.scale = Vec3f(1, 1, 1)
 		
 		self.created_time = TimeStamp(0)
+		self.last_modified_time = TimeStamp(0)
 		self.creator_id = 0  # UserID (uint32)
 
 		self.flags = 0 # uint32
@@ -97,6 +98,7 @@ class WorldObject:
 		self.scale.writeToStream(stream)
 
 		self.created_time.writeToStream(stream)
+		self.last_modified_time.writeToStream(stream)
 		stream.writeUInt32(self.creator_id)
 
 		stream.writeUInt32(self.flags)
@@ -160,6 +162,7 @@ class WorldObject:
 		self.scale = readVec3fFromStream(stream)
 
 		self.created_time = readTimeStampFromStream(stream)
+		self.last_modified_time = readTimeStampFromStream(stream)
 		self.creator_id = stream.readUInt32()
 
 		self.flags = stream.readUInt32()
@@ -168,7 +171,7 @@ class WorldObject:
 
 		self.aabb_min = readVec3fFromStream(stream)
 		self.aabb_max = readVec3fFromStream(stream)
-		
+
 		#print("self.uid: " + str(self.uid))
 		#print("self.creator_name: " + self.creator_name)
 		#print("Read scale: " + str(self.scale.x) + ", " + str(self.scale.y) + ", " + str(self.scale.z))
