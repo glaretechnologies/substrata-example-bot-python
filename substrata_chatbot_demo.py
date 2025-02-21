@@ -93,8 +93,14 @@ plain_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
 
 print("Connecting to server '" + server_hostname + "'...")
 
-conn = ssl.wrap_socket(plain_socket)
-conn.connect((server_hostname,  7600))
+# (pre-python 3.7)
+#conn = ssl.wrap_socket(plain_socket)
+#conn.connect((server_hostname, 7600))
+# ========================
+# https://stackoverflow.com/questions/4818280/ssl-wrap-socket-attributeerror-module-object-has-no-attribute-wrap-socket
+sslSettings = ssl.SSLContext(ssl.PROTOCOL_TLS)
+conn = sslSettings.wrap_socket(plain_socket)
+conn.connect((server_hostname,7600))
 
 print("Connected to server '" + server_hostname + "'.")
 
